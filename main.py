@@ -331,10 +331,7 @@ class ClinicalTrialsDownloader:
             dir_parts.append(self._sanitize_filename(subject))
         if investigator:
             dir_parts.append(f"investigator_{self._sanitize_filename(investigator)}")
-        
-        if not dir_parts:
-            dir_parts.append("all_studies")
-        
+
         subject_dir = self.output_dir / "_".join(dir_parts)
         subject_dir.mkdir(parents=True, exist_ok=True)
         
@@ -344,8 +341,6 @@ class ClinicalTrialsDownloader:
             search_desc.append(f"about '{subject}'")
         if investigator:
             search_desc.append(f"by investigator '{investigator}'")
-        if not search_desc:
-            search_desc.append("for all studies")
         
         if verbose:
             if require_icf:
