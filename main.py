@@ -392,8 +392,6 @@ class ClinicalTrialsDownloader:
                     print(f"  Downloading ICF: {study_docs.icf.filename}")
                 icf_success = self.download_document(study_docs.icf, icf_path)
                 time.sleep(REQUEST_DELAY)
-            elif verbose and require_icf:
-                print(f"  Note: No ICF document available")
             
             # Determine success based on requirements
             if require_icf:

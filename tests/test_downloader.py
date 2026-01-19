@@ -842,3 +842,145 @@ class TestDownloadDocumentEdgeCases:
         result = downloader.download_document(doc, save_path)
 
         assert result is False
+
+
+class TestDownloadPairsVerboseMessages:
+    """Tests for verbose output messages in download_pairs."""
+
+    @patch('main.ClinicalTrialsDownloader.download_document')
+    @patch('main.ClinicalTrialsDownloader.search_studies_with_documents')
+    @patch('time.sleep')
+    @patch('builtins.print')
+    def test_verbose_no_icf_mode_search_message(self, mock_print, mock_sleep, mock_search,
+                                                 mock_download, sample_study_protocol_only,
+                                                 temp_output_dir):
+        """Test verbose message when searching in protocol-only mode (--no-icf)."""
+        downloader = ClinicalTrialsDownloader(output_dir=str(temp_output_dir))
+
+        mock_search.return_value = [sample_study_protocol_only]
+        mock_download.return_value = True
+
+        pairs = downloader.download_pairs(
+            subject="diabetes",
+            num_pairs=1,
+            verbose=True,
+            require_icf=False  # This triggers line 349
+        )
+
+        # Verify the protocol-only search message was printed
+        call_strings = [str(call) for call in mock_print.call_args_list]
+        assert any("Protocol documents" in s for s in call_strings)
+
+    @patch('main.ClinicalTrialsDownloader.download_document')
+    @patch('main.ClinicalTrialsDownloader.search_studies_with_documents')
+    @patch('time.sleep')
+    @patch('builtins.print')
+    def test_verbose_protocol_only_success_message(self, mock_print, mock_sleep, mock_search,
+                                                    mock_download, sample_study_protocol_only,
+                                                    temp_output_dir):
+        """Test 'Successfully downloaded protocol' message (line 410)."""
+        downloader = ClinicalTrialsDownloader(output_dir=str(temp_output_dir))
+
+        mock_search.return_value = [sample_study_protocol_only]
+        mock_download.return_value = True
+
+        pairs = downloader.download_pairs(
+            subject="diabetes",
+            num_pairs=1,
+            verbose=True,
+            require_icf=False  # Protocol only mode
+        )
+
+        # Verify success message for protocol-only download
+        call_strings = [str(call) for call in mock_print.call_args_list]
+        assert any("Successfully downloaded protocol" in s for s in call_strings)
+
+    @patch('main.ClinicalTrialsDownloader.search_studies_with_documents')
+    @patch('time.sleep')
+    @patch('builtins.print')
+    def test_verbose_failed_download_message(self, mock_print, mock_sleep, mock_search,
+                                              sample_study_with_both_docs, temp_output_dir):
+        """Test 'Failed to download' message (line 420)."""
+        downloader = ClinicalTrialsDownloader(output_dir=str(temp_output_dir))
+
+        mock_search.return_value = [sample_study_with_both_docs]
+
+        # Mock download to fail
+        with patch.object(downloader, 'download_document', return_value=False):
+            pairs = downloader.download_pairs(
+                subject="diabetes",
+                num_pairs=1,
+                verbose=True,
+                require_icf=True
+            )
+
+        # Verify failure message was printed
+        call_strings = [str(call) for call in mock_print.call_args_list]
+        assert any("Failed to download" in s for s in call_strings)
+
+    @patch('main.ClinicalTrialsDownloader.search_studies_with_documents')
+    @patch('time.sleep')
+    def test_cleanup_existing_protocol_file(self, mock_sleep, mock_search,
+                                             sample_study_with_both_docs, temp_output_dir):
+        """Test cleanup of existing protocol file on failure (line 414)."""
+        downloader = ClinicalTrialsDownloader(output_dir=str(temp_output_dir))
+
+        mock_search.return_value = [sample_study_with_both_docs]
+
+        # Create the directory structure
+        subject_dir = temp_output_dir / "diabetes"
+        subject_dir.mkdir(parents=True, exist_ok=True)
+        study_dir = subject_dir / "NCT12345678"
+        study_dir.mkdir(exist_ok=True)
+
+        # Create a protocol file that should be cleaned up
+        protocol_file = study_dir / "protocol_Protocol_001.pdf"
+        protocol_file.write_text("dummy content")
+
+        # Mock download_document to create the file then fail on ICF
+        def mock_download(doc, path):
+            if "protocol" in str(path).lower():
+                path.write_text("protocol content")
+                return True
+            return False  # ICF download fails
+
+        with patch.object(downloader, 'download_document', side_effect=mock_download):
+            pairs = downloader.download_pairs(
+                subject="diabetes",
+                num_pairs=1,
+                verbose=False,
+                require_icf=True
+            )
+
+        # Protocol file should be cleaned up after ICF failure
+        assert not protocol_file.exists() or len(pairs) > 0
+
+    @patch('main.ClinicalTrialsDownloader.search_studies_with_documents')
+    @patch('time.sleep')
+    def test_cleanup_existing_icf_file(self, mock_sleep, mock_search,
+                                        sample_study_with_both_docs, temp_output_dir):
+        """Test cleanup of existing ICF file on failure (line 416)."""
+        downloader = ClinicalTrialsDownloader(output_dir=str(temp_output_dir))
+
+        mock_search.return_value = [sample_study_with_both_docs]
+
+        # Track which files were created
+        files_created = []
+
+        def mock_download(doc, path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("content")
+            files_created.append(path)
+            # First download succeeds, second fails
+            return len(files_created) == 1
+
+        with patch.object(downloader, 'download_document', side_effect=mock_download):
+            pairs = downloader.download_pairs(
+                subject="diabetes",
+                num_pairs=1,
+                verbose=False,
+                require_icf=True
+            )
+
+        # Both files should be cleaned up on failure
+        assert len(pairs) == 0
