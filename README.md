@@ -54,14 +54,14 @@ uv run python main.py --subject "alzheimer's disease" --pairs 20 --quiet
 
 ### Command-Line Options
 
-| Option | Short | Description | Default |
-|--------|-------|-------------|---------|
-| `--subject` | `-s` | Medical condition/disease to search for | None |
-| `--investigator` | `-i` | Investigator name to filter by | None |
-| `--pairs` | `-n` | Number of document pairs to download | 5 |
-| `--output` | `-o` | Output directory for downloads | `./clinical_trial_documents` |
-| `--quiet` | `-q` | Suppress progress output | False |
-| `--no-icf` | | Download protocols even without ICF documents | False |
+```
+-s, --subject        Medical condition/disease to search for
+-i, --investigator   Investigator name to filter by
+-n, --pairs          Number of document pairs to download (default: 5)
+-o, --output         Output directory (default: ./clinical_trial_documents)
+-q, --quiet          Suppress progress output
+    --no-icf         Download protocols even without ICF documents
+```
 
 **Note:** At least one of `--subject` or `--investigator` must be provided.
 
