@@ -359,11 +359,6 @@ class ClinicalTrialsDownloader:
         )
         
         if not studies:
-            if verbose:
-                if require_icf:
-                    print("No studies found with both document types.")
-                else:
-                    print("No studies found with protocol documents.")
             return []
         
         downloaded_pairs = []
