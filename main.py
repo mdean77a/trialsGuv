@@ -17,7 +17,6 @@ Date: January 2026
 """
 
 import argparse
-import json
 import re
 import sys
 import time
@@ -415,53 +414,6 @@ class ClinicalTrialsDownloader:
         return safe_name.strip('_').lower()
 
 
-def create_manifest(
-    output_dir: Path, 
-    subject: str, 
-    investigator: str,
-    pairs: list[tuple[Path, Optional[Path]]]
-) -> Path:
-    """
-    Create a manifest file documenting the downloaded documents.
-    
-    Args:
-        output_dir: Base output directory
-        subject: Search subject (may be None)
-        investigator: Investigator name (may be None)
-        pairs: List of (protocol_path, icf_path) tuples (icf_path may be None)
-        
-    Returns:
-        Path to manifest file
-    """
-    manifest = {
-        "download_date": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "total_pairs": len(pairs),
-        "pairs": []
-    }
-    
-    if subject:
-        manifest["subject"] = subject
-    if investigator:
-        manifest["investigator"] = investigator
-    
-    for protocol_path, icf_path in pairs:
-        nct_id = protocol_path.parent.name
-        pair_entry = {
-            "nct_id": nct_id,
-            "protocol": str(protocol_path.relative_to(output_dir)),
-            "clinicaltrials_url": f"https://clinicaltrials.gov/study/{nct_id}"
-        }
-        if icf_path:
-            pair_entry["icf"] = str(icf_path.relative_to(output_dir))
-        manifest["pairs"].append(pair_entry)
-    
-    manifest_path = output_dir / "manifest.json"
-    with open(manifest_path, 'w') as f:
-        json.dump(manifest, f, indent=2)
-        
-    return manifest_path
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Download paired Protocol and ICF documents from ClinicalTrials.gov",
@@ -544,15 +496,7 @@ Examples:
         require_icf=not args.no_icf
     )
     
-    # Create manifest file
     if downloaded_pairs:
-        manifest_path = create_manifest(
-            Path(args.output),
-            args.subject,
-            args.investigator,
-            downloaded_pairs
-        )
-        
         print(f"\n{'=' * 60}")
         print(f"Download Complete!")
         print(f"{'=' * 60}")
@@ -560,10 +504,8 @@ Examples:
             print(f"Successfully downloaded {len(downloaded_pairs)} protocol documents")
         else:
             print(f"Successfully downloaded {len(downloaded_pairs)} document pairs")
-        print(f"Manifest file: {manifest_path}")
         print(f"\nDocuments are organized in: {args.output}/")
-        
-        # Print summary
+
         print(f"\nDownloaded studies:")
         for protocol_path, icf_path in downloaded_pairs:
             nct_id = protocol_path.parent.name

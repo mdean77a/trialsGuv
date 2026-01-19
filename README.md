@@ -9,7 +9,6 @@ A Python CLI tool that downloads paired Protocol and Informed Consent Form (ICF)
 - **Paired document downloads**: Download both Protocol and ICF documents together, or protocols only
 - **Automatic rate limiting**: Respects ClinicalTrials.gov API rate limits (~50 requests/minute)
 - **Organized output**: Documents are organized by search criteria and NCT ID
-- **Manifest generation**: Creates a JSON manifest file documenting all downloaded documents
 
 ## Installation
 
@@ -79,7 +78,6 @@ clinical_trial_documents/
 │   │   ├── protocol_Protocol_002.pdf
 │   │   └── icf_ICF_002.pdf
 │   └── ...
-└── manifest.json                      # Download manifest
 ```
 
 When searching by investigator only:
@@ -94,26 +92,6 @@ When combining subject and investigator:
 clinical_trial_documents/
 └── diabetes_investigator_john_smith/
     └── ...
-```
-
-### Manifest File
-
-A `manifest.json` file is created with metadata about the downloads:
-
-```json
-{
-  "download_date": "2026-01-19 12:00:00",
-  "subject": "diabetes",
-  "total_pairs": 5,
-  "pairs": [
-    {
-      "nct_id": "NCT12345678",
-      "protocol": "diabetes/NCT12345678/protocol_Protocol_001.pdf",
-      "icf": "diabetes/NCT12345678/icf_ICF_001.pdf",
-      "clinicaltrials_url": "https://clinicaltrials.gov/study/NCT12345678"
-    }
-  ]
-}
 ```
 
 ## Testing
@@ -139,7 +117,6 @@ open htmlcov/index.html
 
 - `tests/test_dataclasses.py` - Tests for DocumentInfo and StudyDocuments classes
 - `tests/test_downloader.py` - Tests for ClinicalTrialsDownloader class
-- `tests/test_manifest.py` - Tests for manifest creation
 - `tests/test_cli.py` - Tests for CLI argument parsing and main function
 - `tests/test_integration.py` - End-to-end integration tests
 

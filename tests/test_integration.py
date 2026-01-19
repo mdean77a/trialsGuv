@@ -2,21 +2,20 @@
 import pytest
 from pathlib import Path
 from unittest.mock import patch, Mock
-import json
 
 
 class TestEndToEndWorkflow:
     """End-to-end integration tests."""
-    
+
     @patch('main.ClinicalTrialsDownloader.download_document')
     @patch('requests.Session')
     @patch('time.sleep')
-    def test_complete_download_workflow(self, mock_sleep, mock_session_class, 
-                                       mock_download, temp_output_dir, 
+    def test_complete_download_workflow(self, mock_sleep, mock_session_class,
+                                       mock_download, temp_output_dir,
                                        sample_api_response_success):
-        """Test complete workflow from search to download to manifest."""
-        from main import ClinicalTrialsDownloader, create_manifest
-        
+        """Test complete workflow from search to download."""
+        from main import ClinicalTrialsDownloader
+
         # Setup mocks
         mock_session = Mock()
         mock_response = Mock()
@@ -25,11 +24,11 @@ class TestEndToEndWorkflow:
         mock_session.get.return_value = mock_response
         mock_session_class.return_value = mock_session
         mock_download.return_value = True
-        
+
         # Create downloader
         downloader = ClinicalTrialsDownloader(output_dir=str(temp_output_dir))
         downloader.session = mock_session
-        
+
         # Run download
         pairs = downloader.download_pairs(
             subject="diabetes",
@@ -37,26 +36,11 @@ class TestEndToEndWorkflow:
             verbose=False,
             require_icf=True
         )
-        
+
         # Verify results
         assert len(pairs) > 0
         protocol_path, icf_path = pairs[0]
         assert protocol_path is not None
-        
-        # Create manifest
-        manifest_path = create_manifest(
-            temp_output_dir,
-            subject="diabetes",
-            investigator=None,
-            pairs=pairs
-        )
-        
-        # Verify manifest
-        assert manifest_path.exists()
-        with open(manifest_path) as f:
-            manifest_data = json.load(f)
-        assert manifest_data["subject"] == "diabetes"
-        assert manifest_data["total_pairs"] >= 1
 
 
 class TestErrorHandling:
@@ -125,25 +109,25 @@ class TestErrorHandling:
 
 class TestDirectoryStructure:
     """Tests for directory structure creation."""
-    
+
     def test_subject_directory_creation(self, temp_output_dir):
         """Test that subject directories are created correctly."""
         from main import ClinicalTrialsDownloader
-        
+
         downloader = ClinicalTrialsDownloader(output_dir=str(temp_output_dir))
         sanitized = downloader._sanitize_filename("Diabetes Type 2")
-        
+
         assert sanitized == "diabetes_type_2"
-    
+
     def test_investigator_directory_creation(self, temp_output_dir):
         """Test that investigator directories are created correctly."""
         from main import ClinicalTrialsDownloader
-        
+
         downloader = ClinicalTrialsDownloader(output_dir=str(temp_output_dir))
         sanitized = downloader._sanitize_filename("John Smith, MD")
-        
+
         assert sanitized == "john_smith_md"
-    
+
     @patch('main.ClinicalTrialsDownloader.search_studies_with_documents')
     @patch('main.ClinicalTrialsDownloader.download_document')
     @patch('time.sleep')
@@ -305,76 +289,3 @@ class TestMultipleStudyDownload:
 
         # Should have downloaded one pair (second study)
         assert len(pairs) == 1
-
-
-class TestManifestIntegration:
-    """Integration tests for manifest creation with various scenarios."""
-
-    @patch('main.ClinicalTrialsDownloader.download_document')
-    @patch('main.ClinicalTrialsDownloader.search_studies_with_documents')
-    @patch('time.sleep')
-    def test_manifest_contains_all_downloaded_studies(self, mock_sleep, mock_search,
-                                                       mock_download, temp_output_dir):
-        """Test that manifest includes all successfully downloaded studies."""
-        from main import ClinicalTrialsDownloader, create_manifest
-
-        # Create multiple studies
-        studies = []
-        for i in range(3):
-            studies.append({
-                "protocolSection": {
-                    "identificationModule": {
-                        "nctId": f"NCT1234567{i}",
-                        "briefTitle": f"Test Study {i}"
-                    }
-                },
-                "documentSection": {
-                    "largeDocumentModule": {
-                        "largeDocs": [
-                            {
-                                "typeAbbrev": "Prot",
-                                "hasProtocol": True,
-                                "hasIcf": False,
-                                "filename": f"Protocol_{i}.pdf"
-                            },
-                            {
-                                "typeAbbrev": "ICF",
-                                "hasProtocol": False,
-                                "hasIcf": True,
-                                "filename": f"ICF_{i}.pdf"
-                            }
-                        ]
-                    }
-                }
-            })
-
-        mock_search.return_value = studies
-        mock_download.return_value = True
-
-        downloader = ClinicalTrialsDownloader(output_dir=str(temp_output_dir))
-
-        pairs = downloader.download_pairs(
-            subject="diabetes",
-            num_pairs=3,
-            verbose=False,
-            require_icf=True
-        )
-
-        manifest_path = create_manifest(
-            temp_output_dir,
-            subject="diabetes",
-            investigator=None,
-            pairs=pairs
-        )
-
-        with open(manifest_path) as f:
-            manifest = json.load(f)
-
-        assert manifest["total_pairs"] == 3
-        assert len(manifest["pairs"]) == 3
-
-        # Verify each study is in manifest
-        nct_ids = [p["nct_id"] for p in manifest["pairs"]]
-        assert "NCT12345670" in nct_ids
-        assert "NCT12345671" in nct_ids
-        assert "NCT12345672" in nct_ids
