@@ -18,14 +18,12 @@ Date: January 2026
 
 import argparse
 import json
-import os
 import re
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urljoin
 
 import requests
 
@@ -36,10 +34,6 @@ STUDIES_ENDPOINT = f"{BASE_URL}/studies"
 
 # Rate limiting - ClinicalTrials.gov allows ~50 requests/minute
 REQUEST_DELAY = 1.5  # seconds between requests
-
-# Document types we're looking for
-DOC_TYPE_PROTOCOL = "Prot"  # Protocol
-DOC_TYPE_ICF = "ICF"  # Informed Consent Form
 
 
 @dataclass
@@ -169,7 +163,7 @@ class ClinicalTrialsDownloader:
         # Filter studies based on document requirements
         filtered_studies = []
         studies_with_docs = 0
-        for idx, study in enumerate(all_studies):
+        for study in all_studies:
             # Check if study has document section
             if study.get("documentSection"):
                 studies_with_docs += 1
@@ -185,8 +179,7 @@ class ClinicalTrialsDownloader:
             
             if len(filtered_studies) >= max_results:
                 break
-        
-        total_count = data.get("totalCount", len(all_studies))
+
         print(f"  Retrieved {len(all_studies)} studies total")
         print(f"  {studies_with_docs} studies have document sections")
         if require_icf:
@@ -355,24 +348,13 @@ class ClinicalTrialsDownloader:
             return []
         
         downloaded_pairs = []
-        studies_processed = 0
-        
+
         for study in studies:
             if len(downloaded_pairs) >= num_pairs:
                 break
-                
+
             study_docs = self.extract_document_info(study)
-            
-            # Check document requirements
-            if require_icf:
-                if not study_docs.has_both():
-                    continue
-            else:
-                if not study_docs.has_protocol():
-                    continue
-                
-            studies_processed += 1
-            
+
             if verbose:
                 print(f"\n[{len(downloaded_pairs) + 1}/{num_pairs}] {study_docs.nct_id}: {study_docs.brief_title[:60]}...")
             
