@@ -61,9 +61,17 @@ class StudyDocuments:
         return self.protocol is not None
 
 
+@dataclass
+class SearchStats:
+    """Statistics from a search operation."""
+    total_retrieved: int
+    with_documents: int
+    matching_requirements: int
+
+
 class ClinicalTrialsDownloader:
     """Downloads clinical trial document pairs from ClinicalTrials.gov."""
-    
+
     def __init__(self, output_dir: str = "./clinical_trial_documents"):
         self.output_dir = Path(output_dir)
         self.session = requests.Session()
@@ -71,14 +79,16 @@ class ClinicalTrialsDownloader:
             "Accept": "application/json",
             "User-Agent": "ClinicalTrialsDocDownloader/1.0 (Research Tool)"
         })
+        self.last_search_stats: Optional[SearchStats] = None
         
     def search_studies_with_documents(
-        self, 
+        self,
         subject: str = None,
         investigator: str = None,
         max_results: int = 100,
         page_size: int = 20,
-        require_icf: bool = True
+        require_icf: bool = True,
+        verbose: bool = True
     ) -> list[dict]:
         """
         Search for studies with protocol documents (and optionally ICF documents).
@@ -129,7 +139,8 @@ class ClinicalTrialsDownloader:
                 params["pageToken"] = next_page_token
                 
             try:
-                print(f"  Searching... (retrieved {len(all_studies)} so far)")
+                if verbose:
+                    print(f"  Searching... (retrieved {len(all_studies)} so far)")
                 response = self.session.get(STUDIES_ENDPOINT, params=params)
                 response.raise_for_status()
                 data = response.json()
@@ -137,7 +148,8 @@ class ClinicalTrialsDownloader:
                 # Extract studies from response
                 study_list = data.get("studies", [])
                 if not study_list:
-                    print(f"  No more studies found.")
+                    if verbose:
+                        print(f"  No more studies found.")
                     break
                     
                 all_studies.extend(study_list)
@@ -151,10 +163,12 @@ class ClinicalTrialsDownloader:
                 time.sleep(REQUEST_DELAY)
                 
             except requests.exceptions.RequestException as e:
-                print(f"  Error searching studies: {e}")
+                if verbose:
+                    print(f"  Error searching studies: {e}")
                 if hasattr(e, 'response') and e.response is not None:
                     if e.response.status_code == 429:
-                        print("  Rate limited. Waiting 60 seconds...")
+                        if verbose:
+                            print("  Rate limited. Waiting 60 seconds...")
                         time.sleep(60)
                         continue
                 break
@@ -179,12 +193,20 @@ class ClinicalTrialsDownloader:
             if len(filtered_studies) >= max_results:
                 break
 
-        print(f"  Retrieved {len(all_studies)} studies total")
-        print(f"  {studies_with_docs} studies have document sections")
-        if require_icf:
-            print(f"  Found {len(filtered_studies)} studies with both Protocol and ICF documents")
-        else:
-            print(f"  Found {len(filtered_studies)} studies with Protocol documents")
+        # Store statistics for later use
+        self.last_search_stats = SearchStats(
+            total_retrieved=len(all_studies),
+            with_documents=studies_with_docs,
+            matching_requirements=len(filtered_studies)
+        )
+
+        if verbose:
+            print(f"  Retrieved {len(all_studies)} studies total")
+            print(f"  {studies_with_docs} studies have document sections")
+            if require_icf:
+                print(f"  Found {len(filtered_studies)} studies with both Protocol and ICF documents")
+            else:
+                print(f"  Found {len(filtered_studies)} studies with Protocol documents")
         return filtered_studies
     
     def extract_document_info(self, study: dict, debug: bool = False) -> StudyDocuments:
@@ -325,10 +347,11 @@ class ClinicalTrialsDownloader:
         if not search_desc:
             search_desc.append("for all studies")
         
-        if require_icf:
-            print(f"\nSearching for studies {' and '.join(search_desc)} with both Protocol and ICF documents...")
-        else:
-            print(f"\nSearching for studies {' and '.join(search_desc)} with Protocol documents...")
+        if verbose:
+            if require_icf:
+                print(f"\nSearching for studies {' and '.join(search_desc)} with both Protocol and ICF documents...")
+            else:
+                print(f"\nSearching for studies {' and '.join(search_desc)} with Protocol documents...")
         
         # Search for studies - get extra in case some downloads fail
         search_multiplier = 2
@@ -336,14 +359,16 @@ class ClinicalTrialsDownloader:
             subject=subject,
             investigator=investigator,
             max_results=num_pairs * search_multiplier,
-            require_icf=require_icf
+            require_icf=require_icf,
+            verbose=verbose
         )
         
         if not studies:
-            if require_icf:
-                print("No studies found with both document types.")
-            else:
-                print("No studies found with protocol documents.")
+            if verbose:
+                if require_icf:
+                    print("No studies found with both document types.")
+                else:
+                    print("No studies found with protocol documents.")
             return []
         
         downloaded_pairs = []
@@ -496,15 +521,26 @@ Examples:
         require_icf=not args.no_icf
     )
     
-    if downloaded_pairs:
-        print(f"\n{'=' * 60}")
-        print(f"Download Complete!")
-        print(f"{'=' * 60}")
+    print(f"\n{'=' * 60}")
+    print(f"Summary")
+    print(f"{'=' * 60}")
+
+    # Display search statistics
+    if downloader.last_search_stats:
+        stats = downloader.last_search_stats
+        print(f"Studies retrieved from API: {stats.total_retrieved}")
+        print(f"Studies with document sections: {stats.with_documents}")
         if args.no_icf:
-            print(f"Successfully downloaded {len(downloaded_pairs)} protocol documents")
+            print(f"Studies with Protocol documents: {stats.matching_requirements}")
         else:
-            print(f"Successfully downloaded {len(downloaded_pairs)} document pairs")
-        print(f"\nDocuments are organized in: {args.output}/")
+            print(f"Studies with Protocol + ICF: {stats.matching_requirements}")
+
+    if downloaded_pairs:
+        if args.no_icf:
+            print(f"Successfully downloaded: {len(downloaded_pairs)} protocol documents")
+        else:
+            print(f"Successfully downloaded: {len(downloaded_pairs)} document pairs")
+        print(f"\nDocuments saved to: {args.output}/")
 
         print(f"\nDownloaded studies:")
         for protocol_path, icf_path in downloaded_pairs:
@@ -514,9 +550,8 @@ Examples:
             else:
                 print(f"  - {nct_id} (Protocol only)")
     else:
-        print(f"\n{'=' * 60}")
-        print("No document pairs were successfully downloaded.")
-        print("This could be due to:")
+        print(f"Successfully downloaded: 0")
+        print("\nNo documents were downloaded. This could be due to:")
         print("  - No studies found matching the search criteria")
         print("  - Network issues during download")
         print("  - Rate limiting by the API")
