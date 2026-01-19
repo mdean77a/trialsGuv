@@ -1,0 +1,17 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Coverage reports
+.coverage
+htmlcov/
+
+# Downloaded documents (don't commit to repo)
+clinical_trial_documents/

@@ -1,0 +1,17 @@
+[project]
+name = "trialsgov"
+version = "0.1.0"
+description = "ClinicalTrials.gov Document Downloader"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "requests>=2.32.5",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.1",
+    "requests-mock>=1.11.0",
+]
