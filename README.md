@@ -18,18 +18,14 @@ A Python CLI tool that downloads paired Protocol and Informed Consent Form (ICF)
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
-### Setup
+### Install Dependencies
 
 ```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/trialsgov.git
-cd trialsgov
-
-# Install dependencies with uv
+# Using uv (recommended)
 uv sync
 
-# Or with pip
-pip install -r requirements.txt
+# Or using pip
+pip install requests
 ```
 
 ## Usage
